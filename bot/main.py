@@ -28,7 +28,7 @@ if not TOKEN:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ответ на /start"""
     keyboard = [
-        [InlineKeyboardButton("👋 Привет", callback_data="say_hello")],
+        [InlineKeyboardButton("👋 Привет, Танечка! Ты лучшая ❤️", callback_data="say_hello")],
         [InlineKeyboardButton("ℹ️ Инфо о боте", callback_data="info")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
