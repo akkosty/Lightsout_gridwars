@@ -28,7 +28,7 @@ if not TOKEN:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ответ на /start"""
     keyboard = [
-        [InlineKeyboardButton("👋 Привет, Танечка! Ты лучшая ❤️", callback_data="say_hello")],
+        [InlineKeyboardButton("👋 Привет!", callback_data="say_hello")],
         [InlineKeyboardButton("ℹ️ Инфо о боте", callback_data="info")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -44,7 +44,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()  # обязательный ACK
 
     if query.data == "say_hello":
-        await query.edit_message_text("👋 Привет от бота!")
+        await query.edit_message_text("👋 Привет, Танечка! Ты лучшая ❤️")
     elif query.data == "info":
         await query.edit_message_text(
             "🤖 Я простой бот‑скелет. Добавляйте свои команды и логику!"
