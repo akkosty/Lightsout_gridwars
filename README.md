@@ -1,4 +1,4 @@
-# 📦 Базовый скелет Telegram‑бота 
+# 📦 Базовый скелет Telegram‑бота  
 
 Это минимальный шаблон бота на Python + `python-telegram-bot`.  
 Он уже готов к запуску в Docker и CI/CD через GitHub Actions.
