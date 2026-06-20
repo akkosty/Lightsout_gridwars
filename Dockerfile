@@ -1,45 +1,50 @@
-# Оптимизированный многоэтапный Dockerfile для Go-приложения
-FROM golang:1.22-alpine AS builder
+# Используем Go 1.21 как базовый образ (или другую версию по необходимости)
+FROM golang:1.21-alpine AS builder
 
-# Настройка окружения
+# Установка необходимых пакетов
+RUN apk add --no-cache git ca-certificates tzdata
+
 WORKDIR /app
-ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 
-# Копируем только зависимости для лучшего кэширования
+# Копируем go.mod и go.sum (если есть) для быстрой сборки модулей
 COPY go.mod go.sum ./
 RUN go mod download
 
 # Копируем исходный код
 COPY . .
 
-# Собираем бинарный файл
-RUN go build -ldflags="-s -w" -o main .
+# Переключаемся на версию Go 1.21-alpine для финального образа с меньшим размером
+FROM golang:1.21-alpine
 
-# Минимальная базовая imagem для продакшена
-FROM alpine:3.19
-
-# Установка необходимых утилит для работы с контейнерами и времени
-RUN apk --no-cache add ca-certificates tzdata
-
-# Создание пользователя и группы (безопасность)
-RUN addgroup -g 1000 -S appgroup && \
-    adduser -u 1000 -S appuser -G appgroup
+# Установка необходимых системных пакетов
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# Копируем скомпилированный бинарный файл из стадии сборки
-COPY --from=builder --chown=appuser:appgroup /app/main .
-COPY --from=builder --chown=appuser:appgroup /app/*.json ./config/
+# Копируем go.mod и go.sum из builder-стадии
+COPY --from=builder /app/go.mod .
+COPY --from=builder /app/go.sum .
 
-# Устанавливает владельца файлов контейнера
-RUN chown -R appuser:appgroup /app
+# Запускаем сборку бота на Go
+COPY --from=builder /app/bot ./bot
+RUN CGO_ENABLED=0 GOOS=linux go build -o bot ./bot
 
-USER appuser
+# Установка timezone (опционально, но рекомендуется)
+ENV TZ=UTC
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
 
-# Добавляет локальное время для корректной работы таймеров в приложении
-ENV TZ=Europe/Moscow
+# Копируем config.json (если существует в репозитории или нужно смонтировать извне)
+COPY config.json . 2>/dev/null || true
+
+# Создаём необходимые директории и устанавливаем права
+RUN mkdir -p /data /tmp && \
+    chown -R nobody:nogroup /app /data /tmp
+
+# Запускаем бот (без привилегий пользователя root)
+USER nobody
 
 EXPOSE 8080
 
-# Запуск приложения из образа сборки через shell с проверкой окружения
-ENTRYPOINT ["/app/main"]
+ENTRYPOINT ["./bot"]
