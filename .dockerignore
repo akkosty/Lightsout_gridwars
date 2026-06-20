@@ -1,0 +1,31 @@
+# Go workspace files
+.git
+.github
+.gitignore
+*.mod
+go.sum
+
+# Development files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test coverage
+coverage.out
+
+# Local build artifacts
+dist/
+build/
+
+# Docker specific
+Dockerfile*
+.dockerignore
+
+# Python legacy files (if any remain)
+*.py
+venv/
+.venv/
+env/
+.env
