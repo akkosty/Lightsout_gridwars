@@ -1,13 +1,3 @@
 # Lightsout Grid Wars
 
-Игра на разработку стратегических навыков.
-
-## Как начать
-
-1. Склонируйте репозиторий.
-2. Запустите игру через терминал.
-3. Погрузитесь в мир тактических баталий!
-
-## Вклад в проект
-
-Мы приветствуем ваш вклад! Создайте фORK, добавьте свои изменения и отправьте Pull Request.
+A strategic lights out game with a war theme. Challenge your friends and see who can clear the grid under pressure!
