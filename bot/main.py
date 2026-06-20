@@ -44,7 +44,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()  # обязательный ACK
 
     if query.data == "say_hello":
-        await query.edit_message_text("👋 Привет, Танечка! Ты лучшая ❤️")
+        await query.edit_message_text("👋 Привет, Танечка! Ты лучшая ❤️1")
     elif query.data == "info":
         await query.edit_message_text(
             "🤖 Я простой бот‑скелет. Добавляйте свои команды и логику!"
