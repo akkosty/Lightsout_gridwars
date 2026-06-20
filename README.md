@@ -73,29 +73,9 @@ This repository contains both the client-side game logic and a RESTful backend A
 
 | Method | Endpoint             | Description                      |
 |--------|----------------------|----------------------------------|
-| POST   | `/api/v1/game/new`   | Start a new game with specified grid size. |
-| GET    | `/api/v1/game/{id}`  | Get current state of a game by ID. |
-| PUT    | `/api/v1/game/{id}/move` | Apply a move (toggle cell) to the game. |
-| GET    | `/api/v1/leaderboard`| Retrieve top players and scores. |
-
-*Full OpenAPI 3.0 documentation is available in `docs/openapi.yaml`.*
-
-## Project Structure
-
-```
-.
-├── docs/                  # API documentation
-│   └── openapi.yaml
-├── frontend/              # Optional: Web UI (React)
-├── internal/
-│   ├── game/             # Core game logic
-│   ├── api/              # HTTP handlers and middleware
-│   └── database/         # Data persistence layer
-├── main.go               # Application entry point
-├── go.mod / go.sum       # Go module files
-├── Dockerfile            # Container definition
-└── docker-compose.yml    # Local multi-container setup
-```
+| GET    | `/api/game/new`      | Start a new game                 |
+| POST   | `/api/game/move`     | Submit a move for the current game |
+| GET    | `/api/game/status`   | Get the current game state       |
 
 ## Contributing
 
@@ -121,3 +101,14 @@ This project is licensed under the MIT License. See the [LICENSE](https://github
 ---
 
 **Enjoy playing Lightsout Grid Wars!**
+
+### New: Project Status & Roadmap
+
+#### Current Status
+The project is currently in the **alpha stage**, with core game logic implemented and basic API endpoints functional. We are working on the frontend interface and multiplayer functionality.
+
+#### Upcoming Features (Q3 2023)
+- Interactive web-based UI
+- Local multiplayer mode
+- Enhanced hint system
+- Custom grid patterns
