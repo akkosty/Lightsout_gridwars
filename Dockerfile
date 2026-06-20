@@ -1,50 +1,49 @@
-# Используем Go 1.21 как базовый образ (или другую версию по необходимости)
+# Используем официальный Go образ для Linux
 FROM golang:1.21-alpine AS builder
 
 # Установка необходимых пакетов
-RUN apk add --no-cache git ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata git
 
 WORKDIR /app
 
-# Копируем go.mod и go.sum (если есть) для быстрой сборки модулей
+# Копируем go.mod и go.sum для быстрой сборки модулей
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Копируем исходный код
+# Копируем исходный код проекта
 COPY . .
 
-# Переключаемся на версию Go 1.21-alpine для финального образа с меньшим размером
-FROM golang:1.21-alpine
+# Собираем бинарный файл
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./main.go
 
-# Установка необходимых системных пакетов
-RUN apk add --no-cache ca-certificates tzdata
+# Минимальный образ для запуска
+FROM alpine:latest
+
+# Установка системных зависимостей и времени
+RUN apk add --no-cache ca-certificates tzdata && \
+    rm -rf /var/cache/apk/*
+
+# Установка timezone
+ENV TZ=UTC
+RUN cp /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 
-# Копируем go.mod и go.sum из builder-стадии
-COPY --from=builder /app/go.mod .
-COPY --from=builder /app/go.sum .
+# Копируем скомпилированный бинарный файл из стадии builder
+COPY --from=builder /app/main .
 
-# Запускаем сборку бота на Go
-COPY --from=builder /app/bot ./bot
-RUN CGO_ENABLED=0 GOOS=linux go build -o bot ./bot
+# Создаём необходимые директории для телеграм бота (если используются)
+RUN mkdir -p /tmp
 
-# Установка timezone (опционально, но рекомендуется)
-ENV TZ=UTC
-RUN apk add --no-cache tzdata && \
-    cp /usr/share/zoneinfo/$TZ /etc/localtime && \
-    echo $TZ > /etc/timezone
+# Записываем конфиг из образа или создаём пустой файл
+RUN touch config.json || true
 
-# Копируем config.json (если существует в репозитории или нужно смонтировать извне)
-COPY config.json . 2>/dev/null || true
+# Права доступа
+RUN chown -R nobody:nogroup /app /tmp && \
+    chmod +x main
 
-# Создаём необходимые директории и устанавливаем права
-RUN mkdir -p /data /tmp && \
-    chown -R nobody:nogroup /app /data /tmp
-
-# Запускаем бот (без привилегий пользователя root)
 USER nobody
 
 EXPOSE 8080
 
-ENTRYPOINT ["./bot"]
+CMD ["./main"]
