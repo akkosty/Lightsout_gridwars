@@ -6,9 +6,10 @@ RUN apk add --no-cache ca-certificates tzdata git
 
 WORKDIR /app
 
-# Копируем только необходимые файлы проекта (без go.sum)
+# Копируем только необходимые файлы проекта (go.sum критически важен для зависимостей)
 COPY main.go ./main.go
-COPY go.mod ./go.mod  # Важно: нужен для управления зависимостями
+COPY go.mod ./go.mod
+COPY go.sum ./go.sum  # Добавлено: нужен для управления зависимостями
 
 # Копируем конфиг, если существует
 COPY config.json ./config.json || true
