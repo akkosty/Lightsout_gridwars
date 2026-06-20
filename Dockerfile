@@ -6,8 +6,8 @@ RUN apk add --no-cache ca-certificates tzdata git
 
 WORKDIR /app
 
-# Копируем go.mod и go.sum для быстрой сборки модулей
-COPY go.mod go.sum ./
+# Копируем go.mod для быстрой сборки модулей
+COPY go.mod ./
 RUN go mod download
 
 # Копируем исходный код проекта
