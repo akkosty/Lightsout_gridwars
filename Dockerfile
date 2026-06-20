@@ -1,45 +1,45 @@
-# Используем официальный Go образ для Linux
+# Using official Go image for Linux
 FROM golang:1.21-alpine AS builder
 
-# Установка необходимых пакетов
+# Install necessary packages
 RUN apk add --no-cache ca-certificates tzdata git
 
 WORKDIR /app
 
-# Копируем только необходимые файлы проекта (go.sum критически важен для зависимостей)
+# Copy only necessary project files (go.sum is critical for dependencies)
 COPY main.go ./main.go
 COPY go.mod ./go.mod
-COPY go.sum ./go.sum  # Добавлено: нужен для управления зависимостями
+COPY go.sum ./go.sum
 
-# Копируем конфиг, если существует
+# Copy config if exists
 COPY config.json ./config.json || true
 
-# Запускаем обновление модулей и скачивание зависимостей
+# Run module download and dependency fetching
 RUN go mod download
 
-# Собираем бинарный файл без CGO
+# Build binary without CGO
 RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
-# Минимальный образ для запуска
+# Minimal image for running
 FROM alpine:latest
 
-# Установка системных зависимостей и времени
+# Install system dependencies and timezone
 RUN apk add --no-cache ca-certificates tzdata && \
     rm -rf /var/cache/apk/*
 
-# Установка timezone
+# Setup timezone
 ENV TZ=UTC
 RUN cp /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 
-# Копируем скомпилированный бинарный файл из стадии builder
+# Copy compiled binary from builder stage
 COPY --from=builder /app/main .
 
-# Создаём необходимые директории и временную зону
+# Create necessary directories and temp zone
 RUN mkdir -p /tmp
 
-# Права доступа
+# Permissions
 RUN chown -R nobody:nogroup /app /tmp && \
     chmod +x main
 
@@ -47,4 +47,4 @@ USER nobody
 
 EXPOSE 8080
 
-CMD ["./main"]
+CMD ["/app/main"]
