@@ -6,15 +6,18 @@ RUN apk add --no-cache ca-certificates tzdata git
 
 WORKDIR /app
 
-# Копируем go.mod для быстрой сборки модулей
-COPY go.mod ./
+# Копируем только необходимые файлы проекта (без go.sum)
+COPY main.go ./main.go
+COPY go.mod ./go.mod  # Важно: нужен для управления зависимостями
+
+# Копируем конфиг, если существует
+COPY config.json ./config.json || true
+
+# Запускаем обновление модулей и скачивание зависимостей
 RUN go mod download
 
-# Копируем исходный код проекта
-COPY . .
-
-# Собираем бинарный файл
-RUN CGO_ENABLED=0 GOOS=linux go build -o main ./main.go
+# Собираем бинарный файл без CGO
+RUN CGO_ENABLED=0 GOOS=linux go build -o main .
 
 # Минимальный образ для запуска
 FROM alpine:latest
@@ -32,11 +35,8 @@ WORKDIR /app
 # Копируем скомпилированный бинарный файл из стадии builder
 COPY --from=builder /app/main .
 
-# Создаём необходимые директории для телеграм бота (если используются)
+# Создаём необходимые директории и временную зону
 RUN mkdir -p /tmp
-
-# Записываем конфиг из образа или создаём пустой файл
-RUN touch config.json || true
 
 # Права доступа
 RUN chown -R nobody:nogroup /app /tmp && \
