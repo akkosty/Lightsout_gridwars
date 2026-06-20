@@ -1,18 +1,36 @@
-# Базовый образ
-FROM python:3.11-slim
+# Базовый образ с Go
+FROM golang:1.21-alpine AS builder
 
-# Устанавливаем зависимости для работы Telegram Bot API (необязательно, но полезно)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev && rm -rf /var/lib/apt/lists/*
+# Установка зависимостей для компиляции в alpine
+RUN apk add --no-cache gcc musl-dev
 
 WORKDIR /app
+
+# Копируем go.mod и go.sum (если будут созданы)
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Копируем исходный код
 COPY . .
 
-# Установка зависимостей
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+# Компилируем с целевой платформой для Docker
+ARG TARGETPLATFORM
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$(if [ "$TARGETPLATFORM" = "amd64" ] || [ "$TARGETPLATFORM" = "x86_64" ]; then echo "amd64"; else echo "arm64"; fi) go build -ldflags="-s -w" -o bot/main .
 
-# Переменная окружения, которую будет подставлять CI/CD (не храните токен в Dockerfile!)
+# Финальный этап: минимальный образ
+FROM alpine:latest
+
+WORKDIR /app
+
+# Копируем скомпилированный бинарный файл
+COPY --from=builder /app/bot/main .
+
+# Добавляем зависимости для работы (если необходимы)
+RUN apk add --no-cache curl
+
+# Переменная окружения для токена
 ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
 
-CMD ["python", "bot/main.py"]
+EXPOSE 8080
+
+CMD ["/app/bot/main"]
