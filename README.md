@@ -1,11 +1,11 @@
-# 📦 Базовый скелет Telegram‑бота !!!
+# 🦄 Lightsout GridWars Telegram Bot (Go Edition)!!!
 
-Это минимальный шаблон бота на Python + `python-telegram-bot`. 
-Он уже готов к запуску в Docker и CI/CD через GitHub Actions. !!!
+Это минимальный шаблон Go бота для Telegram с использованием библиотеки `go-telegram/bot`. 
+Он готов к запуску в Docker и CI/CD через GitHub Actions. !!!
 
-## 🚀 Как запустить локально (Polling) !!!
+## 🚀 Как запустить локально!!!
 
-1. **Создайте бота** у @BotFather → получите токен !!!
+1. **Создайте бота** у @BotFather → получите токен!!!
 2. Склонируйте репозиторий:
 
    ```bash
@@ -13,40 +13,41 @@
    cd your-repo
    ```
 
-3. Установите зависимости:
+3. Установите зависимости и соберите проект:
 
    ```bash
-   pip install -r requirements.txt
+   go mod download
+   go build -o main ./bot
    ```
 
 4. Создайте `.env` файл с токеном бота и запустите:
 
    ```bash
-   python bot.py
+   TELEGRAM_BOT_TOKEN=ваш_токен DEBUG=True ./main
    ```
 
-## 🐳 Как запустить в Docker !!!
+## 🐳 Как запустить в Docker!!!
 
 ```bash
 docker-compose up -d
 ```
 
-## ⚙️ Настройки через переменные окружения !!!
+## ⚙️ Настройки через переменные окружения!!!
 
 Создайте файл `.env`:
 
 ```
-BOT_TOKEN=ваш_токен_от_BotFather
+TELEGRAM_BOT_TOKEN=ваш_токен_от_BotFather
 DEBUG=True
 ```
 
 ---
 
-### 🛠 GitHub Actions !!!
+### 🛠 GitHub Actions!!!
 
 Этот репозиторий поддерживает автоматический CI/CD через GitHub Actions. 
 
-### ⚠️ Важные примечания !!!
+### ⚠️ Важные примечания!!!
 
 - **Безопасность:** Никогда не храните токены в коде!!!  
 - **Тестирование:** Тестируйте бота локально перед деплоем!!!  
