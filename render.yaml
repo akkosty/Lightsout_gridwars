@@ -1,9 +1,11 @@
 services:
   - type: web            # тип сервиса (web, background, static)
     name: telegram-bot   # имя сервиса в Render
-    env: python          # используем Python‑образ (Render автоматически ставит python:3.x)
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m bot
+    env: go              # используем Go‑образ
+    buildCommand: |
+      go mod tidy
+      go build -o bin/bot ./cmd
+    startCommand: ./bin/bot
 
     # Описание переменных окружения:
     envVars:
