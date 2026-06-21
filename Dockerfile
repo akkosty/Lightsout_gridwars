@@ -3,7 +3,11 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 COPY go.mod .
-RUN apk --no-cache add git && go mod download
+RUN apk --no-cache add git && \
+    echo "/usr/local/bin" >> ~/.bashrc && \
+    git init --bare /tmp/.git && true  # Проверка, что git работает
+
+RUN go mod download && go mod verify
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
