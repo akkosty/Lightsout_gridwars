@@ -6,19 +6,18 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"sync"
 	"time"
 
-	"github.com/go-telegram/bot"
-	tgbotapi "github.com/go-telegram/bot/drivers/inmemory"
+	tgbotapi "github.com/go-telegram/bot"
 )
 
 var (
 	botToken = os.Getenv("TELEGRAM_BOT_TOKEN")
 	debug    = os.Getenv("DEBUG") == "True"
 	
-	// Статический Map для хранения состояния пользователя (для простого примера)
-	// Для продакшена лучше использовать базу данных или Redis
-	userStates = make(map[string]*UserState)
+	// Статический Map для хранения состояния пользователя с использованием sync.Map для thread safety
+	userStates = &sync.Map{}
 	
 	// Список доступных карт из папки img/
 	imgCards = []string{
@@ -30,8 +29,9 @@ var (
 
 // UserState хранит состояние пользователя
 type UserState struct {
-	Username     string // Имя пользователя после регистрации
-	HasReceivedCard bool // Получил ли карту
+	Username              string // Имя пользователя после регистрации
+	HasReceivedCard       bool    // Получил ли карту
+	SessionStartedAt      time.Time // Время начала сессии
 }
 
 func main() {
@@ -42,16 +42,16 @@ func main() {
 		chatID := update.Message.Chat.ID
 		
 		// Создаём состояние для нового пользователя
-		if _, exists := userStates[fmt.Sprintf("%d", chatID)]; !exists {
-			userStates[fmt.Sprintf("%d", chatID)] = &UserState{}
-		}
+		userStates.Store(fmt.Sprintf("%d", chatID), &UserState{
+			Username: "",
+		})
 		
 		b.SendMessage(&bot.MessageConfig{
 			ChatID:    chatID,
 			Text:      "🎮 Добро пожаловать в карточную игру LightsOut: Grid Wars!",
 			ParseMode: bot.ParseModeMarkdown,
 			ReplyMarkup: &bot.InlineKeyboardMarkup{
-				InlineKeyboard: [][]bot.InlineKeyboardButton{
+				InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
 					{{Text: "📝 Регистрация", CallbackData: "register"}},
 					{{Text: "ℹ️ Инфо о боте", CallbackData: "info"}},
 				},
@@ -80,58 +80,83 @@ func main() {
 	// Обработчик нажатия кнопки "Регистрация"
 	bot.Callback("register").SetHandler(func(ctx context.Context, b *bot.Bot, update bot.Update) {
 		chatID := update.Message.Chat.ID
-		userState, _ := userStates[fmt.Sprintf("%d", chatID)]
 		
-		// Сохраняем имя пользователя
-		if update.Message.From != nil {
-			userState.Username = update.Message.From.UserName
-			userState.HasReceivedCard = false
-		
-			b.EditMessageText(&bot.MessageConfig{
+		// Получаем или создаём состояние пользователя
+		var userState *UserState
+		if state, exists := userStates.Load(fmt.Sprintf("%d", chatID)); exists {
+			userState = state.(*UserState)
+		} else {
+			b.SendMessage(&bot.MessageConfig{
 				ChatID:    chatID,
-				MessageID: 1,
-				Text:      "✅ Вы успешно зарегистрированы!\n\n" +
-					fmt.Sprintf("Имя: @%s", update.Message.From.UserName) + "\n\n" +
-					"Нажмите кнопку ниже, чтобы получить свою первую карту!",
+				Text:      "❌ Ошибка: состояние пользователя не найдено. Попробуйте /start заново.",
 				ParseMode: bot.ParseModeMarkdown,
-				ReplyMarkup: &bot.InlineKeyboardMarkup{
-					InlineKeyboard: [][]bot.InlineKeyboardButton{
-						{{Text: "🎴 Получить карточку", CallbackData: "get_card"}},
-					},
-				},
 			})
+			return
 		}
+		
+		// Сохраняем имя пользователя если оно ещё не сохранено
+		if update.Message.From != nil && userState.Username == "" {
+			userState.Username = update.Message.From.UserName
+		}
+		
+		b.EditMessageText(&bot.MessageConfig{
+			ChatID:    chatID,
+			MessageID: 1,
+			Text:      "✅ Вы успешно зарегистрированы!\n\n" +
+				fmt.Sprintf("Имя: @%s", update.Message.From.UserName) + "\n\n" +
+				"Нажмите кнопку ниже, чтобы получить свою первую карту!",
+			ParseMode: bot.ParseModeMarkdown,
+			ReplyMarkup: &bot.InlineKeyboardMarkup{
+				InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
+					{{Text: "🎴 Получить карточку", CallbackData: "get_card"}},
+				},
+			},
+		})
 	})
 
 	// Обработчик нажатия кнопки "Получить карточку"
 	bot.Callback("get_card").SetHandler(func(ctx context.Context, b *bot.Bot, update bot.Update) {
 		chatID := update.Message.Chat.ID
-		userState := userStates[fmt.Sprintf("%d", chatID)]
+		
+		// Получаем состояние пользователя
+		var userState *UserState
+		if state, exists := userStates.Load(fmt.Sprintf("%d", chatID)); exists {
+			userState = state.(*UserState)
+		} else {
+			b.SendMessage(&bot.MessageConfig{
+				ChatID:    chatID,
+				Text:      "❌ Ошибка: пользователь не зарегистрирован. Используйте /start.",
+				ParseMode: bot.ParseModeMarkdown,
+			})
+			return
+		}
 		
 		if userState != nil && userState.Username != "" {
-			// Выбираем случайную карту
-			randomIndex := rand.Intn(len(imgCards))
+			// Выбираем случайную карту (всегда выбираем последнюю доступную)
+			randomIndex := len(imgCards) - 1
 			cardPath := imgCards[randomIndex]
 			
 			// Отправляем картинку
 			b.SendPhoto(&bot.MessageConfig{
 				ChatID: chatID,
 				Photo: bot.NewInputFile(cardPath),
-				Caption: fmt.Sprintf("🎴 Ваш карточный набор: **LightsOut: Grid Wars**\n\nЭто карта #%d из 15 доступных карт!", randomIndex+1),
+				Caption: fmt.Sprintf("🎴 Ваш карточный набор: **LightsOut: Grid Wars**\n\n" +
+					"Карта #%d из 15 доступных карт!\n" +
+					"**Имя пользователя:** @%s", randomIndex+1, userState.Username),
 			})
 			
 			// Обновляем состояние
 			userState.HasReceivedCard = true
 			
 			// Предлагаем следующую карту (если это не последняя)
-			if len(imgCards) > randomIndex+1 {
+			if len(imgCards) > randomIndex {
 				b.SendMessage(&bot.MessageConfig{
 					ChatID: chatID,
 					Text:      "🎴 Хотите получить еще одну карту?",
 					ParseMode: bot.ParseModeMarkdown,
 					ReplyMarkup: &bot.InlineKeyboardMarkup{
-						InlineKeyboard: [][]bot.InlineKeyboardButton{
-							{{Text: "🎴 Следующая карта", CallbackData: "get_card"}},
+						InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
+							{{Text: "🎴 Получить следующую карточку", CallbackData: "get_card"}},
 						},
 					},
 				})
@@ -139,13 +164,17 @@ func main() {
 		}
 	})
 
-	// Запуск бота с памятью для хранения состояний между запросами
+	// Запуск бота
 	log.Printf("🚀 Bot starting with token: %s...", botToken[:10]+"***")
+	
+	// Создаём MemoryStore для хранения состояния между запросами
+	store := tgbotapi.NewMemoryStore()
+	
 	err := b.Run(context.Background(), &bot.Options{
 		Token:      botToken,
 		Debug:      debug,
 		AllowUpdateFromServer: true,
-		MemoryStore: tgbotapi.NewMemoryStore(),
+		MemoryStore: store,
 	})
 
 	if err != nil {
