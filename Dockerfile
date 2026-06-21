@@ -3,23 +3,20 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /src
 
-# Cache go.mod dependencies
+# Cache dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the source code and build the binary
+# Copy source and build from bot directory
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/bot ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/bot ./bot
 
 # Runtime stage
 FROM alpine:3.19
-
 WORKDIR /app
 
-# Copy the compiled binary from builder
+# Copy binary and assets
 COPY --from=builder /app/bot .
-
-# Environment variable for bot token (set by Render)
-ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+COPY img ./img
 
 CMD ["./bot"]
