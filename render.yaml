@@ -1,11 +1,14 @@
 services:
   - type: web            # тип сервиса (web, background, static)
-    name: telegram-bot   # имя сервиса в Render
-    env: python          # используем Python‑образ (Render автоматически ставит python:3.x)
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m bot
-
+    name: lightsout-bot  # имя сервиса в Render
+    env: golang          # используем Go образ (Render автоматически ставит golang:1.x)
+    
+    # Команды для сборки и запуска бота на Go
+    buildCommand: cd /testbed && go mod download && go build -o main ./bot
+    
+    startCommand: ./main
+    
     # Описание переменных окружения:
     envVars:
       - key: TELEGRAM_BOT_TOKEN
-        fromSecret: telegram_bot_token   # <-- ссылка на Render‑секрет
+        fromSecret: telegram_bot_token  # ссылка на Render секрет
