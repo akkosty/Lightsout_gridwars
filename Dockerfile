@@ -14,7 +14,6 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/main .
 COPY --from=builder /app/go.mod .
-COPY --from=builder /app/go.sum .
 
 ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
 CMD ["/main"]
