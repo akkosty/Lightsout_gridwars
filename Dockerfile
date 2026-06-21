@@ -1,18 +1,21 @@
-# Базовый образ
-FROM python:3.11-slim
-
-# Устанавливаем зависимости для работы Telegram Bot API (необязательно, но полезно)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev && rm -rf /var/lib/apt/lists/*
+# Базовый образ Go
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
-# Установка зависимостей
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+# Минимальный образ с Go ботом
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /app
+COPY --from=builder /app/main .
+COPY --from=builder /app/go.mod .
+COPY --from=builder /app/go.sum .
 
-# Переменная окружения, которую будет подставлять CI/CD (не храните токен в Dockerfile!)
 ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-
-CMD ["python", "bot/main.py"]
+CMD ["/main"]
