@@ -1,81 +1,139 @@
 package main
 
 import (
-    "context"
-    "log"
-    "os"
-    "github.com/go-telegram/bot"
-    "github.com/go-telegram/bot/models"
+	"context"
+	"log"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"time"
+
+	tgb "github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 )
 
+var (
+	// Хранилище зарегистрированных пользователей:
+	registered = make(map[int64]string) // key – chat ID, value – username
+	// Путь к папке с изображениями (должна существовать в репозитории)
+	imgDir = "img"
+)
+
+// ---------- Утилиты ---------------------------------------------------------
+
+func randomImage() (string, error) {
+	files, err := os.ReadDir(imgDir)
+	if err != nil {
+		return "", err
+	}
+	var images []string
+	for _, f := range files {
+		if !f.IsDir() {
+			ext := filepath.Ext(f.Name())
+			switch ext {
+			case ".jpg", ".jpeg", ".png", ".gif":
+				images = append(images, filepath.Join(imgDir, f.Name()))
+			}
+		}
+	}
+	if len(images) == 0 {
+		return "", os.ErrNotExist
+	}
+	randIdx := rand.Intn(len(images))
+	return images[randIdx], nil
+}
+
+// ---------- Обработчики -----------------------------------------------------
+
+func startHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
+	msg := tgb.NewMessage(update.Message.Chat.ID,
+		"Добро пожаловать в карточную игру LightsOut: Grid Wars")
+	msg.ReplyMarkup = registrationKeyboard()
+	_, err := b.SendMessage(ctx, msg)
+	if err != nil {
+		log.Printf("send start message error: %v", err)
+	}
+}
+
+func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
+	cb := update.CallbackQuery
+	data := cb.Data
+
+	switch data {
+	case "info":
+		answer := tgb.NewMessage(cb.Message.Chat.ID,
+			"🎉 Танечка — наш главный персонаж! Она любит собирать карты и делиться ими с друзьями.")
+		b.SendMessage(ctx, answer)
+
+	case "register":
+		user := cb.From
+		registered[cb.Message.Chat.ID] = user.UserName
+		answer := tgb.NewMessage(cb.Message.Chat.ID,
+			"✅ Вы успешно зарегистрированы! Теперь можете получить карточку.")
+		answer.ReplyMarkup = getCardKeyboard()
+		b.SendMessage(ctx, answer)
+
+	case "get_card":
+		path, err := randomImage()
+		if err != nil {
+			log.Printf("random image error: %v", err)
+			b.AnswerCallbackQuery(ctx,
+				tgb.NewAnswerCallbackQuery(cb.ID).WithText("Не удалось найти карточку."))
+			return
+		}
+		photo := tgb.NewPhoto(cb.Message.Chat.ID, path)
+		_, err = b.SendPhoto(ctx, photo)
+		if err != nil {
+			log.Printf("send photo error: %v", err)
+		}
+
+	default:
+		// неизвестный callback – игнорируем
+	}
+}
+
+// ---------- Клавиатуры -------------------------------------------------------
+
+func registrationKeyboard() *tgb.InlineKeyboardMarkup {
+	return tgb.NewInlineKeyboardMarkup(
+		tgb.NewInlineKeyboardRow(
+			tgb.NewInlineKeyboardButtonData("Регистрация", "register"),
+			tgb.NewInlineKeyboardButtonData("Инфо", "info"),
+		),
+	)
+}
+
+func getCardKeyboard() *tgb.InlineKeyboardMarkup {
+	return tgb.NewInlineKeyboardMarkup(
+		tgb.NewInlineKeyboardRow(
+			tgb.NewInlineKeyboardButtonData("Получить карточку", "get_card"),
+		),
+	)
+}
+
+// ---------- main ------------------------------------------------------------
+
 func main() {
-    token := os.Getenv("TELEGRAM_BOT_TOKEN")
-    if token == "" {
-        log.Fatal("TELEGRAM_BOT_TOKEN not set")
-    }
-    // Create bot instance
-    client, err := bot.New(token)
-    if err != nil {
-        log.Fatalf("Failed to create bot: %v", err)
-    }
-    defer client.Close()
+	rand.Seed(time.Now().UnixNano())
 
-    // Set up handlers
-    client.HandleMessage(func(ctx context.Context, b *bot.Bot, msg *models.Message) error {
-        if msg.Text == "/start" {
-            keyboard := []bot.InlineKeyboardButton{{
-                Text:         "👋 Привет!",
-                CallbackData: "say_hello",
-            }, {
-                Text:         "ℹ️ Инфо о боте",
-                CallbackData: "info",
-            }}
-            _, err := b.SendMessage(ctx, &bot.SendMessageParams{
-                ChatID:    msg.Chat.ID,
-                Text:      "Привет! Выбери действие:",
-                ReplyMarkup: bot.InlineKeyboardMarkup{InlineKeyboard: [][]bot.InlineKeyboardButton{{keyboard[0]}, {keyboard[1]}}},
-            })
-            return err
-        }
-        // Echo for any other text (debug)
-        if msg.Text != "" {
-            _, err := b.SendMessage(ctx, &bot.SendMessageParams{ChatID: msg.Chat.ID, Text: "🗣 Вы сказали: " + msg.Text})
-            return err
-        }
-        return nil
-    })
+	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+	if token == "" {
+		log.Fatal("TELEGRAM_BOT_TOKEN env var is required")
+	}
 
-    client.HandleCallbackQuery(func(ctx context.Context, b *bot.Bot, query *models.CallbackQuery) error {
-        // Acknowledge callback
-        _, _ = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{CallbackQueryID: query.ID})
-        switch query.Data {
-        case "say_hello":
-            _, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
-                ChatID:    query.Message.Chat.ID,
-                MessageID: query.Message.MessageID,
-                Text:      "👋 Привет, Танечка! Ты лучшая ❤️1",
-            })
-            return err
-        case "info":
-            _, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
-                ChatID:    query.Message.Chat.ID,
-                MessageID: query.Message.MessageID,
-                Text:      "🤖 Я простой бот‑скелет. Добавляйте свои команды и логику!",
-            })
-            return err
-        default:
-            _, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
-                ChatID:    query.Message.Chat.ID,
-                MessageID: query.Message.MessageID,
-                Text:      "❓ Неизвестный callback: " + query.Data,
-            })
-            return err
-        }
-    })
+	bot, err := tgb.New(token,
+		tgb.WithDefaultHandler(startHandler), // будет вызвано для любого сообщения без специф. хендлера
+	)
+	if err != nil {
+		log.Fatalf("bot init error: %v", err)
+	}
 
-    // Start polling
-    log.Println("Bot started, polling…")
-    if err := client.Start(context.Background()); err != nil {
-        log.Fatalf("Polling error: %v", err)
-    }
+	// Обрабатываем только callback‑query (нажатия на inline‑кнопки)
+	bot.RegisterHandler(tgb.HandlerTypeCallbackQuery, callbackHandler)
+
+	ctx := context.Background()
+	log.Println("Bot started")
+	if err = bot.Start(ctx); err != nil {
+		log.Fatalf("bot start error: %v", err)
+	}
 }
