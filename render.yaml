@@ -2,7 +2,7 @@ services:
   - type: web            # тип сервиса (web, background, static)
     name: lightsout-bot  # имя сервиса в Render
     env: golang          # используем Go образ (Render автоматически ставит golang:1.x)
-    
+
     # Команды для сборки и запуска бота на Go
     buildCommand: cd /testbed && go mod download && go build -o main ./bot
     
