@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	tgb "github.com/go-telegram/bot"
+	tgbotapi "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
 
@@ -47,12 +47,11 @@ func randomImage() (string, error) {
 
 // ---------- Обработчики -----------------------------------------------------
 
-func startHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
-	msg := &tgb.SendMessageParams{
-		ChatID:        update.Message.Chat.ID,
-		Text:          "Добро пожаловать в карточную игру LightsOut: Grid Wars",
-		ReplyMarkup:   registrationKeyboard(),
-		ParseMode:     "HTML",
+func startHandler(ctx context.Context, b *tgbotapi.Bot, update *models.Update) {
+	msg := &tgbotapi.SendMessageParams{
+		ChatID:    update.Message.Chat.ID,
+		Text:      "Добро пожаловать в карточную игру LightsOut: Grid Wars",
+		ParseMode: "HTML",
 	}
 	_, err := b.SendMessage(ctx, msg)
 	if err != nil {
@@ -60,46 +59,56 @@ func startHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 	}
 }
 
-func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
+func callbackHandler(ctx context.Context, b *tgbotapi.Bot, update *models.Update) {
 	cb := update.CallbackQuery
 	data := cb.Data
 
 	switch data {
 	case "info":
-		msg := &tgb.SendMessageParams{
-			ChatID: cb.Message.Chat.ID,
-			Text:   "🎉 Танечка — наш главный персонаж! Она любит собирать карты и делиться ими с друзьями.",
+		msg := &tgbotapi.SendMessageParams{
+			ChatID:    cb.Message.Chat.ID,
+			Text:      "🎉 Танечка — наш главный персонаж! Она любит собирать карты и делиться ими с друзьями.",
+			ParseMode: "HTML",
 		}
-		b.SendMessage(ctx, msg)
+		_, err := b.SendMessage(ctx, msg)
+		if err != nil {
+			log.Printf("send info message error: %v", err)
+		}
 
 	case "register":
-		user := cb.From
+		username := cb.From.UserName
 		mu.Lock()
-		registered[cb.Message.Chat.ID] = user.UserName
+		registered[cb.Message.Chat.ID] = username
 		mu.Unlock()
-		msg := &tgb.SendMessageParams{
-			ChatID:      cb.Message.Chat.ID,
-			Text:        "✅ Вы успешно зарегистрированы! Теперь можете получить карточку.",
-			ReplyMarkup: getCardKeyboard(),
+		msg := &tgbotapi.SendMessageParams{
+			ChatID:    cb.Message.Chat.ID,
+			Text:      "✅ Вы успешно зарегистрированы! Теперь можете получить карточку.",
+			ParseMode: "HTML",
 		}
-		b.SendMessage(ctx, msg)
+		_, err := b.SendMessage(ctx, msg)
+		if err != nil {
+			log.Printf("send register message error: %v", err)
+		}
 
 	case "get_card":
 		path, err := randomImage()
 		if err != nil {
 			log.Printf("random image error: %v", err)
-			ans := &tgb.AnswerCallbackQueryParams{
+			ans := &tgbotapi.AnswerCallbackQueryParams{
 				CallbackQueryID: cb.ID,
 				Text:            "Не удалось найти карточку.",
 			}
-			b.AnswerCallbackQuery(ctx, ans)
+			_, err = b.AnswerCallbackQuery(ctx, ans)
+			if err != nil {
+				log.Printf("answer callback query error: %v", err)
+			}
 			return
 		}
-		photo := &tgb.SendPhotoParams{
+		// Отправка файла по пути (библиотека поддерживает файловую систему напрямую)
+		_, err = b.SendPhoto(ctx, &tgbotapi.SendPhotoParams{
 			ChatID: cb.Message.Chat.ID,
-			Photo:   tgb.InputFile{File: path},
-		}
-		_, err = b.SendPhoto(ctx, photo)
+			Photo:  path,
+		})
 		if err != nil {
 			log.Printf("send photo error: %v", err)
 		}
@@ -112,9 +121,9 @@ func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 
 // ---------- Клавиатуры -------------------------------------------------------
 
-func registrationKeyboard() *tgb.InlineKeyboardMarkup {
-	return &tgb.InlineKeyboardMarkup{
-		InlineKeyboard: [][]tgb.InlineKeyboardButton{
+func registrationKeyboard() *tgbotapi.InlineKeyboardMarkup {
+	return &tgbotapi.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
 			{
 				{Text: "Регистрация", CallbackData: "register"},
 				{Text: "Инфо", CallbackData: "info"},
@@ -123,9 +132,9 @@ func registrationKeyboard() *tgb.InlineKeyboardMarkup {
 	}
 }
 
-func getCardKeyboard() *tgb.InlineKeyboardMarkup {
-	return &tgb.InlineKeyboardMarkup{
-		InlineKeyboard: [][]tgb.InlineKeyboardButton{
+func getCardKeyboard() *tgbotapi.InlineKeyboardMarkup {
+	return &tgbotapi.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
 			{
 				{Text: "Получить карточку", CallbackData: "get_card"},
 			},
@@ -143,15 +152,15 @@ func main() {
 		log.Fatal("TELEGRAM_BOT_TOKEN env var is required")
 	}
 
-	bot, err := tgb.New(token,
-		tgb.WithDefaultHandler(startHandler), // будет вызвано для любого сообщения без специф. хендлера
+	bot, err := tgbotapi.New(token,
+		tgbotapi.WithDefaultHandler(startHandler),
+		tgbotapi.WithCallbackQueryDataHandler("^register$", tgbotapi.MatchTypeExact, callbackHandler),
+		tgbotapi.WithCallbackQueryDataHandler("^info$", tgbotapi.MatchTypeExact, callbackHandler),
+		tgbotapi.WithCallbackQueryDataHandler("^get_card$", tgbotapi.MatchTypeExact, callbackHandler),
 	)
 	if err != nil {
 		log.Fatalf("bot init error: %v", err)
 	}
-
-	// Обрабатываем только callback‑query (нажатия на inline‑кнопки)
-	bot.RegisterHandler(tgb.HandlerTypeCallbackQuery, callbackHandler)
 
 	ctx := context.Background()
 	log.Println("Bot started")
