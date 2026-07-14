@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	tgb "github.com/go-telegram/bot"
@@ -15,6 +16,7 @@ import (
 var (
 	// Хранилище зарегистрированных пользователей:
 	registered = make(map[int64]string) // key – chat ID, value – username
+	mu         sync.RWMutex            // мьютекс для безопасного доступа к registered
 	// Путь к папке с изображениями (должна существовать в репозитории)
 	imgDir = "img"
 )
@@ -47,9 +49,10 @@ func randomImage() (string, error) {
 
 func startHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 	msg := &tgb.SendMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		Text:      "Добро пожаловать в карточную игру LightsOut: Grid Wars",
-		ReplyMarkup: registrationKeyboard(),
+		ChatID:        update.Message.Chat.ID,
+		Text:          "Добро пожаловать в карточную игру LightsOut: Grid Wars",
+		ReplyMarkup:   registrationKeyboard(),
+		ParseMode:     "HTML",
 	}
 	_, err := b.SendMessage(ctx, msg)
 	if err != nil {
@@ -71,7 +74,9 @@ func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 
 	case "register":
 		user := cb.From
+		mu.Lock()
 		registered[cb.Message.Chat.ID] = user.UserName
+		mu.Unlock()
 		msg := &tgb.SendMessageParams{
 			ChatID:      cb.Message.Chat.ID,
 			Text:        "✅ Вы успешно зарегистрированы! Теперь можете получить карточку.",
@@ -101,6 +106,7 @@ func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 
 	default:
 		// неизвестный callback – игнорируем
+		log.Printf("unknown callback data: %s", data)
 	}
 }
 
