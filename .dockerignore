@@ -1,6 +1,5 @@
 .git
 .github
-img
 *.md
 .Dockerfile
 .dockerignore

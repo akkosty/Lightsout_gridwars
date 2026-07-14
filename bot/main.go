@@ -46,9 +46,11 @@ func randomImage() (string, error) {
 // ---------- Обработчики -----------------------------------------------------
 
 func startHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
-	msg := tgb.NewMessage(update.Message.Chat.ID,
-		"Добро пожаловать в карточную игру LightsOut: Grid Wars")
-	msg.ReplyMarkup = registrationKeyboard()
+	msg := &tgb.SendMessageParams{
+		ChatID:    update.Message.Chat.ID,
+		Text:      "Добро пожаловать в карточную игру LightsOut: Grid Wars",
+		ReplyMarkup: registrationKeyboard(),
+	}
 	_, err := b.SendMessage(ctx, msg)
 	if err != nil {
 		log.Printf("send start message error: %v", err)
@@ -61,27 +63,37 @@ func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 
 	switch data {
 	case "info":
-		answer := tgb.NewMessage(cb.Message.Chat.ID,
-			"🎉 Танечка — наш главный персонаж! Она любит собирать карты и делиться ими с друзьями.")
-		b.SendMessage(ctx, answer)
+		msg := &tgb.SendMessageParams{
+			ChatID: cb.Message.Chat.ID,
+			Text:   "🎉 Танечка — наш главный персонаж! Она любит собирать карты и делиться ими с друзьями.",
+		}
+		b.SendMessage(ctx, msg)
 
 	case "register":
 		user := cb.From
 		registered[cb.Message.Chat.ID] = user.UserName
-		answer := tgb.NewMessage(cb.Message.Chat.ID,
-			"✅ Вы успешно зарегистрированы! Теперь можете получить карточку.")
-		answer.ReplyMarkup = getCardKeyboard()
-		b.SendMessage(ctx, answer)
+		msg := &tgb.SendMessageParams{
+			ChatID:      cb.Message.Chat.ID,
+			Text:        "✅ Вы успешно зарегистрированы! Теперь можете получить карточку.",
+			ReplyMarkup: getCardKeyboard(),
+		}
+		b.SendMessage(ctx, msg)
 
 	case "get_card":
 		path, err := randomImage()
 		if err != nil {
 			log.Printf("random image error: %v", err)
-			b.AnswerCallbackQuery(ctx,
-				tgb.NewAnswerCallbackQuery(cb.ID).WithText("Не удалось найти карточку."))
+			ans := &tgb.AnswerCallbackQueryParams{
+				CallbackQueryID: cb.ID,
+				Text:            "Не удалось найти карточку.",
+			}
+			b.AnswerCallbackQuery(ctx, ans)
 			return
 		}
-		photo := tgb.NewPhoto(cb.Message.Chat.ID, path)
+		photo := &tgb.SendPhotoParams{
+			ChatID: cb.Message.Chat.ID,
+			Photo:   tgb.InputFile{File: path},
+		}
 		_, err = b.SendPhoto(ctx, photo)
 		if err != nil {
 			log.Printf("send photo error: %v", err)
@@ -95,20 +107,24 @@ func callbackHandler(ctx context.Context, b *tgb.Bot, update *models.Update) {
 // ---------- Клавиатуры -------------------------------------------------------
 
 func registrationKeyboard() *tgb.InlineKeyboardMarkup {
-	return tgb.NewInlineKeyboardMarkup(
-		tgb.NewInlineKeyboardRow(
-			tgb.NewInlineKeyboardButtonData("Регистрация", "register"),
-			tgb.NewInlineKeyboardButtonData("Инфо", "info"),
-		),
-	)
+	return &tgb.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgb.InlineKeyboardButton{
+			{
+				{Text: "Регистрация", CallbackData: "register"},
+				{Text: "Инфо", CallbackData: "info"},
+			},
+		},
+	}
 }
 
 func getCardKeyboard() *tgb.InlineKeyboardMarkup {
-	return tgb.NewInlineKeyboardMarkup(
-		tgb.NewInlineKeyboardRow(
-			tgb.NewInlineKeyboardButtonData("Получить карточку", "get_card"),
-		),
-	)
+	return &tgb.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tgb.InlineKeyboardButton{
+			{
+				{Text: "Получить карточку", CallbackData: "get_card"},
+			},
+		},
+	}
 }
 
 // ---------- main ------------------------------------------------------------
