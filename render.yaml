@@ -4,7 +4,7 @@ services:
     env: go              # используем Go‑образ
     buildCommand: |
       go mod tidy
-      go build -o bin/bot ./cmd
+      go build -o bin/bot ./bot
     startCommand: ./bin/bot
 
     # Описание переменных окружения:
