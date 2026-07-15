@@ -153,7 +153,7 @@ func sendStartMenu(botAPI *tgbotapi.BotAPI, chatID int64) {
 		OneTimeKeyboard: false,
 	}
 
-	msg := tgbotapi.NewMessage(chatID, "Выберите действие:")
+	msg := tgbotapi.NewMessage(chatID, "")
 	msg.ReplyMarkup = &replyMarkup
 
 	if _, err := botAPI.Send(msg); err != nil {
