@@ -217,6 +217,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Go binaries
+*.exe
+*.bin
+bot/bot
+main
+
 # Python
 __pycache__/
 *.py[cod]
@@ -224,7 +230,7 @@ __pycache__/
 *.pyd
 env/
 venv/
-.idea/
+idea/
 .vscode/
 
 # Docker
