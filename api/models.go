@@ -67,19 +67,19 @@ type Button struct {
 
 // KeyboardMarkup represents inline or reply keyboard markup
 type KeyboardMarkup struct {
-	Keyboard    [][]Button `json:"keyboard,omitempty"`
-	ResizeKeyboard  bool `json:"resize_keyboard,omitempty"`
-	OneTimeKeyboard bool `json:"one_time_keyboard,omitempty"`
+	Keyboard        [][]Button `json:"keyboard,omitempty"`
+	ResizeKeyboard  bool       `json:"resize_keyboard,omitempty"`
+	OneTimeKeyboard bool       `json:"one_time_keyboard,omitempty"`
 	InlineKeyboard  [][]Button `json:"inline_keyboard,omitempty"`
 }
 
 // MessageRequest represents an incoming message from Telegram
 type MessageRequest struct {
-	MessageID int64   `json:"message_id"`
-	User      *User   `json:"from,omitempty"`
-	Text      string  `json:"text,omitempty"`
-	ChatID    int64   `json:"chat_id"`
-	Timestamp int64   `json:"date"`
+	MessageID int64  `json:"message_id"`
+	User      *User  `json:"from,omitempty"`
+	Text      string `json:"text,omitempty"`
+	ChatID    int64  `json:"chat_id"`
+	Timestamp int64  `json:"date"`
 }
 
 // InfoResponse represents the info menu response

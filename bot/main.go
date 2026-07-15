@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,6 +26,19 @@ func Run() error {
 	}
 
 	log.Printf("Authorized on account %s", botAPI.Self.UserName)
+
+	// Start health check endpoint
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "OK")
+	})
+
+	go func() {
+		log.Println("Starting health check server on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Printf("Health check server error: %v", err)
+		}
+	}()
 
 	config := tgbotapi.UpdateConfig{
 		Timeout: 60,
