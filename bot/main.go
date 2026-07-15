@@ -33,13 +33,48 @@ func Run() error {
 
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello!")
-		if _, err := botAPI.Send(msg); err != nil {
-			log.Printf("Error sending message: %v", err)
+		switch update.Message.Text {
+		case "/start":
+			sendStartMenu(botAPI, update.Message.Chat.ID)
+		case "Инфо":
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Танечка ты супер!!!")
+			if _, err := botAPI.Send(msg); err != nil {
+				log.Printf("Error sending message: %v", err)
+			}
+		case "Зарегистрироваться":
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Регистрация пока не доступна!")
+			if _, err := botAPI.Send(msg); err != nil {
+				log.Printf("Error sending message: %v", err)
+			}
+		default:
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неизвестная команда")
+			if _, err := botAPI.Send(msg); err != nil {
+				log.Printf("Error sending message: %v", err)
+			}
 		}
 	}
 
 	return nil
+}
+
+func sendStartMenu(botAPI *tgbotapi.BotAPI, chatID int64) {
+	keyboard := tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("Инфо"),
+		tgbotapi.NewKeyboardButton("Зарегистрироваться"),
+	)
+
+	replyMarkup := tgbotapi.ReplyKeyboardMarkup{
+		Keyboard:        [][]tgbotapi.KeyboardButton{keyboard},
+		ResizeKeyboard:  true,
+		OneTimeKeyboard: false,
+	}
+
+	msg := tgbotapi.NewMessage(chatID, "Выберите действие:")
+	msg.ReplyMarkup = &replyMarkup
+
+	if _, err := botAPI.Send(msg); err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
 }
 
 func main() {
