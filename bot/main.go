@@ -1,4 +1,4 @@
-package bot
+package main
 
 import (
 	"fmt"
@@ -8,8 +8,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// StartTelegramBot initializes and runs the Telegram bot
-func StartTelegramBot() error {
+func Run() error {
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
 	if token == "" {
 		return fmt.Errorf("TELEGRAM_BOT_TOKEN not set")
@@ -41,4 +40,12 @@ func StartTelegramBot() error {
 	}
 
 	return nil
+}
+
+func main() {
+	if err := Run(); err != nil {
+		log.Printf("Bot error: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
