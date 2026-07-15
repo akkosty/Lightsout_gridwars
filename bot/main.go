@@ -3,68 +3,46 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func main() {
+// Run starts the bot with proper error handling and cleanup
+func Run() error {
 	botToken := getEnv("BOT_TOKEN", "")
+	if botToken == "" {
+		return fmt.Errorf("BOT_TOKEN environment variable is required")
+	}
+
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to create bot: %w", err)
 	}
 
 	bot.Debug = true
 
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	updateConfig := tgbotapi.UpdateConfig{
-		Offset:  0,
-		Timeout: 60,
+	handler, err := NewHandler(bot)
+	if err != nil {
+		return fmt.Errorf("failed to create handler: %w", err)
 	}
 
-	updates := bot.GetUpdatesChan(updateConfig)
+	defer handler.Stop()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Telegram bot is running")
-	})
-
-	log.Printf("Bot is running. Press Ctrl+C to exit.")
-
-	// Health check endpoint for Render (port 8080)
 	go func() {
 		port := getEnv("PORT", "8080")
 		log.Printf("Health check server starting on port %s", port)
-		if err := http.ListenAndServe(":"+port, nil); err != nil {
+		if err := RunServer(port); err != nil {
 			log.Printf("Health check server error: %v", err)
 		}
 	}()
 
-	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
-
-		if update.Message.Text == "/start" {
-			keyboard := tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("Инфо", "info"),
-					tgbotapi.NewInlineKeyboardButtonData("Зарегистрироваться", "register"),
-				),
-			)
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Выберите действие:")
-			msg.ReplyMarkup = keyboard
-
-			if _, err := bot.Send(msg); err != nil {
-				log.Println("Error sending message:", err)
-			}
-		}
-	}
+	return handler.Start()
 }
 
+// getEnv returns environment variable or default value
 func getEnv(key, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
