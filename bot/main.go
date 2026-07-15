@@ -38,16 +38,21 @@ func Run() error {
 			sendStartMenu(botAPI, update.Message.Chat.ID)
 		case "Инфо":
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Танечка ты супер!!!")
+			sendStartMenu(botAPI, update.Message.Chat.ID)
 			if _, err := botAPI.Send(msg); err != nil {
 				log.Printf("Error sending message: %v", err)
 			}
 		case "Зарегистрироваться":
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Регистрация пока не доступна!")
+			sendStartMenu(botAPI, update.Message.Chat.ID)
 			if _, err := botAPI.Send(msg); err != nil {
 				log.Printf("Error sending message: %v", err)
 			}
+		case "Назад":
+			sendStartMenu(botAPI, update.Message.Chat.ID)
 		default:
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Неизвестная команда")
+			sendStartMenu(botAPI, update.Message.Chat.ID)
 			if _, err := botAPI.Send(msg); err != nil {
 				log.Printf("Error sending message: %v", err)
 			}
