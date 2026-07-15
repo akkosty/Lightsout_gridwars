@@ -1,5 +1,5 @@
-module github.com/akkosty/Lightsout_gridwars/bot
+module bot
 
-go 1.22
+go 1.24.0
 
 require github.com/go-telegram/bot v1.22.0
