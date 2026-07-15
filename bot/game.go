@@ -1,4 +1,4 @@
-package main
+package bot
 
 import "fmt"
 
@@ -21,14 +21,14 @@ func NewGame(size int) *Game {
 		Moves:  0,
 		Player: "",
 	}
-	
+
 	for i := 0; i < size; i++ {
 		game.Board[i] = make([]bool, size)
 		for j := 0; j < size; j++ {
 			game.Board[i][j] = false
 		}
 	}
-	
+
 	return game
 }
 
@@ -37,7 +37,7 @@ func (g *Game) Toggle(row, col int) {
 	if row >= 0 && row < g.Size && col >= 0 && col < g.Size {
 		g.Board[row][col] = !g.Board[row][col]
 	}
-	
+
 	if row > 0 {
 		g.Board[row-1][col] = !g.Board[row-1][col]
 	}

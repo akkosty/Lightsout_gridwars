@@ -1,4 +1,4 @@
-package main
+package bot
 
 import (
 	"fmt"
@@ -12,5 +12,5 @@ func RunServer(port string) error {
 		fmt.Fprintf(w, "OK")
 	})
 
-	return http.ListenAndServe(":" + port, nil)
+	return http.ListenAndServe(":"+port, nil)
 }

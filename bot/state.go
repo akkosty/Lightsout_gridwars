@@ -1,4 +1,4 @@
-package main
+package bot
 
 import (
 	"sync"
@@ -28,7 +28,7 @@ func (sm *StateManager) CreateGame(player string, size int) *Game {
 	game.ID = sm.nextID
 	sm.nextID++
 	game.Player = player
-	
+
 	sm.games[game.ID] = game
 	return game
 }
@@ -37,7 +37,7 @@ func (sm *StateManager) CreateGame(player string, size int) *Game {
 func (sm *StateManager) GetGame(id int) (*Game, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	
+
 	game, ok := sm.games[id]
 	return game, ok
 }
@@ -53,7 +53,7 @@ func (sm *StateManager) UpdateGame(game *Game) {
 func (sm *StateManager) DeleteGame(id int) bool {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	_, exists := sm.games[id]
 	if exists {
 		delete(sm.games, id)
