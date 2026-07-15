@@ -2,127 +2,174 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
-	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
 )
 
-var (
-	// Хранилище зарегистрированных пользователей:
-	registered = make(map[int64]string) // key – chat ID, value – username
-	mu         sync.RWMutex            // мьютекс для безопасного доступа к registered
-	// Путь к папке с изображениями (должна существовать в репозитории)
-	imgDir = "img"
-)
+// ---------- База данных (простая реализация) ----------------------------------
 
-// ---------- Утилиты ---------------------------------------------------------
-
-func randomImage() (string, error) {
-	files, err := os.ReadDir(imgDir)
-	if err != nil {
-		return "", err
-	}
-	var images []string
-	for _, f := range files {
-		if !f.IsDir() {
-			ext := filepath.Ext(f.Name())
-			switch ext {
-			case ".jpg", ".jpeg", ".png", ".gif":
-				images = append(images, filepath.Join(imgDir, f.Name()))
-			}
-		}
-	}
-	if len(images) == 0 {
-		return "", os.ErrNotExist
-	}
-	randIdx := rand.Intn(len(images))
-	return images[randIdx], nil
+type PlayerData struct {
+	ID       int64
+	Username string
+	Card     *PlayerCard
 }
 
-// ---------- Обработчики -----------------------------------------------------
+type PlayerCard struct {
+	Name      string
+	Strength  int
+	Agility   int
+	Intellect int
+	Vitality  int
+}
 
-func startHandler(ctx context.Context, b *tgbotapi.Bot, update *models.Update) {
-	msg := &tgbotapi.SendMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		Text:      "Добро пожаловать в карточную игру LightsOut: Grid Wars",
-		ParseMode: "HTML",
+var (
+	registered = make(map[int64]string)
+	mu         sync.Mutex
+	cards      []*PlayerCard
+)
+
+// Инициализация карточек
+func init() {
+	rand.Seed(time.Now().UnixNano())
+	generateCards()
+}
+
+func generateCards() {
+	cardNames := []string{
+		"Воин-Паладин", "Следопыт", "Маг Огня",
+		"Теневой Ninja", "Лекарь", "Крушитель",
 	}
-	_, err := b.SendMessage(ctx, msg)
+	for _, name := range cardNames {
+		cards = append(cards, &PlayerCard{
+			Name:      name,
+			Strength:  rand.Intn(10) + 1,
+			Agility:   rand.Intn(10) + 1,
+			Intellect: rand.Intn(10) + 1,
+			Vitality:  rand.Intn(10) + 1,
+		})
+	}
+}
+
+// ---------- Обработчики -------------------------------------------------------
+
+func startHandler(ctx context.Context, b *tgbotapi.Bot, msg *tgbotapi.Message) {
+	text := "Добро пожаловать в карточную игру LightsOut: Grid Wars"
+	params := &tgbotapi.SendMessageParams{
+		ChatID:      msg.Chat.ID,
+		Text:        text,
+		ParseMode:   "HTML",
+		ReplyMarkup: registrationKeyboard(),
+	}
+	_, err := b.SendMessage(ctx, params)
 	if err != nil {
 		log.Printf("send start message error: %v", err)
 	}
 }
 
-func callbackHandler(ctx context.Context, b *tgbotapi.Bot, update *models.Update) {
-	cb := update.CallbackQuery
+func callbackHandler(ctx context.Context, b *tgbotapi.Bot, cb tgbotapi.CallbackQuery) {
 	data := cb.Data
 
 	switch data {
-	case "info":
-		msg := &tgbotapi.SendMessageParams{
-			ChatID:    cb.Message.Chat.ID,
-			Text:      "🎉 Танечка — наш главный персонаж! Она любит собирать карты и делиться ими с друзьями.",
-			ParseMode: "HTML",
-		}
-		_, err := b.SendMessage(ctx, msg)
-		if err != nil {
-			log.Printf("send info message error: %v", err)
-		}
-
 	case "register":
-		username := cb.From.UserName
+		username := cb.From.Username
 		mu.Lock()
 		registered[cb.Message.Chat.ID] = username
 		mu.Unlock()
-		msg := &tgbotapi.SendMessageParams{
-			ChatID:    cb.Message.Chat.ID,
-			Text:      "✅ Вы успешно зарегистрированы! Теперь можете получить карточку.",
-			ParseMode: "HTML",
-		}
-		_, err := b.SendMessage(ctx, msg)
-		if err != nil {
-			log.Printf("send register message error: %v", err)
-		}
 
-	case "get_card":
-		path, err := randomImage()
-		if err != nil {
-			log.Printf("random image error: %v", err)
-			ans := &tgbotapi.AnswerCallbackQueryParams{
-				CallbackQueryID: cb.ID,
-				Text:            "Не удалось найти карточку.",
+		text := fmt.Sprintf("✅ Вы успешно зарегистрированы как @%s", username)
+		editParams := &tgbotapi.EditMessageTextParams{
+			ChatID:    cb.Message.Chat.ID,
+			MessageID: cb.Message.MessageID,
+			Text:      text,
+		}
+		b.EditMessageText(ctx, editParams)
+
+	case "info":
+		mu.Lock()
+		username := registered[cb.Message.Chat.ID]
+		mu.Unlock()
+
+		if username == "" {
+			text := "❌ Сначала выполните регистрацию"
+			editParams := &tgbotapi.EditMessageTextParams{
+				ChatID:      cb.Message.Chat.ID,
+				MessageID:   cb.Message.MessageID,
+				Text:        text,
+				ReplyMarkup: registrationKeyboard(),
 			}
-			_, err = b.AnswerCallbackQuery(ctx, ans)
-			if err != nil {
-				log.Printf("answer callback query error: %v", err)
-			}
+			b.EditMessageText(ctx, editParams)
 			return
 		}
-		// Отправка файла по пути (библиотека поддерживает файловую систему напрямую)
-		_, err = b.SendPhoto(ctx, &tgbotapi.SendPhotoParams{
-			ChatID: cb.Message.Chat.ID,
-			Photo:  path,
-		})
-		if err != nil {
-			log.Printf("send photo error: %v", err)
-		}
 
-	default:
-		// неизвестный callback – игнорируем
-		log.Printf("unknown callback data: %s", data)
+		info := "Информация о пользователе:\n" +
+			"Username: @" + username + "\n" +
+			"Статус: Игрок\n" +
+			"Игра: LightsOut: Grid Wars"
+
+		editParams := &tgbotapi.EditMessageTextParams{
+			ChatID:      cb.Message.Chat.ID,
+			MessageID:   cb.Message.MessageID,
+			Text:        info,
+			ReplyMarkup: registrationKeyboard(),
+		}
+		b.EditMessageText(ctx, editParams)
+
+	case "get_card":
+		mu.Lock()
+		if _, exists := registered[cb.Message.Chat.ID]; !exists {
+			mu.Unlock()
+			text := "❌ Сначала выполните регистрацию"
+			editParams := &tgbotapi.EditMessageTextParams{
+				ChatID:      cb.Message.Chat.ID,
+				MessageID:   cb.Message.MessageID,
+				Text:        text,
+				ReplyMarkup: registrationKeyboard(),
+			}
+			b.EditMessageText(ctx, editParams)
+			return
+		}
+		mu.Unlock()
+
+		card := cards[rand.Intn(len(cards))]
+
+		text := fmt.Sprintf("🏆 Ваша карточка:\n\n%s", formatCard(card))
+		editParams := &tgbotapi.EditMessageTextParams{
+			ChatID:      cb.Message.Chat.ID,
+			MessageID:   cb.Message.MessageID,
+			Text:        text,
+			ReplyMarkup: getCardKeyboard(),
+		}
+		b.EditMessageText(ctx, editParams)
 	}
+}
+
+func formatCard(card *PlayerCard) string {
+	return "Имя: " + card.Name +
+		"\nСила: ⚔️" + intToString(card.Strength) +
+		"\nЛовкость: 🏃" + intToString(card.Agility) +
+		"\nИнтеллект: 🧠" + intToString(card.Intellect) +
+		"\nВыносливость: ❤️" + intToString(card.Vitality)
+}
+
+func intToString(n int) string {
+	if n < 10 {
+		return "0" + strconv.Itoa(n)
+	}
+	return strconv.Itoa(n)
 }
 
 // ---------- Клавиатуры -------------------------------------------------------
 
-func registrationKeyboard() *tgbotapi.InlineKeyboardMarkup {
-	return &tgbotapi.InlineKeyboardMarkup{
+func registrationKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.InlineKeyboardMarkup{
 		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
 			{
 				{Text: "Регистрация", CallbackData: "register"},
@@ -132,8 +179,8 @@ func registrationKeyboard() *tgbotapi.InlineKeyboardMarkup {
 	}
 }
 
-func getCardKeyboard() *tgbotapi.InlineKeyboardMarkup {
-	return &tgbotapi.InlineKeyboardMarkup{
+func getCardKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.InlineKeyboardMarkup{
 		InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
 			{
 				{Text: "Получить карточку", CallbackData: "get_card"},
@@ -152,19 +199,37 @@ func main() {
 		log.Fatal("TELEGRAM_BOT_TOKEN env var is required")
 	}
 
-	bot, err := tgbotapi.New(token,
-		tgbotapi.WithDefaultHandler(startHandler),
-		tgbotapi.WithCallbackQueryDataHandler("^register$", tgbotapi.MatchTypeExact, callbackHandler),
-		tgbotapi.WithCallbackQueryDataHandler("^info$", tgbotapi.MatchTypeExact, callbackHandler),
-		tgbotapi.WithCallbackQueryDataHandler("^get_card$", tgbotapi.MatchTypeExact, callbackHandler),
-	)
+	bot, err := tgbotapi.NewBot(token)
 	if err != nil {
 		log.Fatalf("bot init error: %v", err)
 	}
 
 	ctx := context.Background()
+
+	// Исправленный способ регистрации обработчиков
+	bot.HandleMessage(func(ctx context.Context, bot *tgbotapi.Bot, msg *tgbotapi.Message) {
+		startHandler(ctx, bot, msg)
+	})
+
+	bot.HandleFunc("callback_query", func(ctx context.Context, bot *tgbotapi.Bot, cb tgbotapi.CallbackQuery) {
+		callbackHandler(ctx, bot, cb)
+	})
+
+	// Health check server (port 8080 для Render)
+	go func() {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+		})
+
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
+		log.Printf("Health check server listening on :%s", port)
+		log.Fatal(http.ListenAndServe(":"+port, nil))
+	}()
+
 	log.Println("Bot started")
-	if err = bot.Start(ctx); err != nil {
-		log.Fatalf("bot start error: %v", err)
-	}
+	bot.Start(ctx)
 }

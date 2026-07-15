@@ -3,13 +3,13 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /build
 
-COPY go.mod go.sum ./
+COPY bot/go.mod bot/go.sum ./
 
 RUN go mod download
 
-COPY . .
+COPY bot/ .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o bot ./bot
+RUN CGO_ENABLED=0 GOOS=linux go build -o bot .
 
 # Run stage
 FROM alpine:latest
